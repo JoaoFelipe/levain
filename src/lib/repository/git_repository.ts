@@ -30,7 +30,7 @@ export default class GitRepository extends AbstractRepository {
   async init(): Promise<void> {
     if (existsSync(this.localDir)) {
       try {
-        await this.gitUtils.pull(this.localDir);
+        await this.gitUtils.update(this.localDir);
       } catch (error) {
         log.info(`Ignoring GIT error and moving on. Error:${error}`);
       }
