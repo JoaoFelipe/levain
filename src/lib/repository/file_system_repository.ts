@@ -1,6 +1,6 @@
 import * as log from "@std/log";
 import * as path from "@std/path";
-import { existsSync, ExpandGlobOptions } from "@std/fs";
+import { existsSync, expandGlob, ExpandGlobOptions } from "@std/fs";
 
 import t from "../i18n.ts";
 
@@ -8,7 +8,6 @@ import Config from "../config.ts";
 import Package from "../package/package.ts";
 import FileSystemPackage from "../package/file_system_package.ts";
 import { Timer } from "../timer.ts";
-import { FileUtils } from "../fs/file_utils.ts";
 import ConsoleFeedback from "../utils/console_feedback.ts";
 
 import AbstractRepository from "./abstract_repository.ts";
@@ -115,7 +114,10 @@ export default class FileSystemRepository extends AbstractRepository {
       root: this.rootDir,
       extended: true,
       includeDirs: true,
-      exclude: this.excludeDirs,
+      exclude: this.excludeDirs.flatMap((dir) => [
+        `**/${dir}`,
+        `**/${dir}/**`,
+      ]),
     };
     const packages: Array<Package> = await this.getPackageFiles(globOptions, this.rootOnly);
 
@@ -123,124 +125,51 @@ export default class FileSystemRepository extends AbstractRepository {
       "lib.repository.file_system_repository.found",
       { pkgNum: StringUtils.padNum(packages.length, 3), dir: this.rootDir, timer: timer.humanize() },
     ));
-
     return packages;
   }
 
   // deno-lint-ignore require-await
   private async getPackageFiles(globOptions: ExpandGlobOptions, rootDirOnly: boolean = false): Promise<Array<Package>> {
     log.debug(`# readPackages: ${JSON.stringify(globOptions)}`);
-    return this.crawlPackages(globOptions["root"] || ".", globOptions, rootDirOnly);
+    return this.crawlPackages(globOptions, rootDirOnly);
   }
 
   private async crawlPackages(
-    dirname: string,
     options: ExpandGlobOptions,
-    rootDirOnly: boolean = false,
-    currentLevel = 0,
+    rootDirOnly: boolean = false
   ): Promise<Array<Package>> {
-    // TODO can we use expandGlob to get faster results?
-    const maxLevels = 5;
-    const nextLevel = currentLevel + 1;
+    const packages: Package[] = [];
+    const promises: Array<Promise<Package | undefined>> = [];
 
-    // User feedback
-    this.feedback.show();
+    const pattern = rootDirOnly
+      ? "*.levain{,.yaml,.yml}"
+      : "**/*.levain{,.yaml,.yml}";
 
-    if (this.excludeDirs.find((ignoreDir) => dirname.toLowerCase().endsWith(ignoreDir.toLowerCase()))) {
-      log.debug(`ignoring ${dirname}`);
-      return [];
-    }
-
-    log.debug(`crawlPackages ${dirname}`);
-    if (!FileUtils.canReadSync(dirname)) {
-      log.debug(`not crawling ${dirname} - can't read`);
-      return [];
-    }
-
-    let entries = undefined;
-    try {
-      entries = Deno.readDirSync(dirname);
-    } catch (error) {
-      log.debug(`error reading ${dirname} - ${error}`);
-    }
-
-    if (!entries) {
-      log.debug(`not crawling ${dirname} - no entries`);
-      return [];
-    }
-
-    const promisesDir: Array<Promise<Array<Package>>> = [];
-    const promisesFile: Array<Promise<Package | undefined>> = [];
-
-    for (const entry of entries) {
-      // User feedback
+    for await (const entry of expandGlob(pattern, options)) {
       this.feedback.show();
 
-      if (entry.isFile && !this.isPackageFile(entry.name)) {
-        // An attempt to optmize search in a crowded directory without packages
-        // Perhaps it would be better to read entries with a pattern
+      if (!entry.isFile) {
         continue;
       }
 
-      const fullUri = path.resolve(dirname, entry.name);
-      if (!FileUtils.canReadSync(fullUri)) {
-        log.debug(`not crawling ${fullUri} - can't read`);
-        continue;
-      }
-
-      if (entry.isDirectory && !rootDirOnly) {
-        if (currentLevel > maxLevels) {
-          log.debug(`skipping ${fullUri}, more then ${maxLevels} levels deep`);
-        } else {
-          promisesDir.push(this.crawlPackages(fullUri, options, false, nextLevel));
-        }
-      } else if (entry.isFile && this.isPackageFile(fullUri)) {
-        promisesFile.push(this.readPackage(fullUri));
-      }
+      promises.push(this.readPackage(entry.path));
     }
 
-    const packages: Array<Package> = [];
+    const results = await Promise.all(promises);
 
-    if (promisesFile.length > 0) {
-      const pkgsFile = await Promise.all(promisesFile);
-      for (const pkg of pkgsFile) {
-        if (pkg) {
-          packages.push(pkg);
-        }
-      }
-    }
-
-    if (promisesDir.length > 0) {
-      const pkgsDir = await Promise.all(promisesDir);
-      for (const pkgArr of pkgsDir) {
-        Array.prototype.push.apply(packages, pkgArr);
+    for (const pkg of results) {
+      if (pkg) {
+        packages.push(pkg);
       }
     }
 
     return packages;
   }
 
-  private isPackageFile(yamlFile: string): boolean {
-    return yamlFile.match(/\.levain(\.ya?ml)?$/) != null;
-  }
 
   private async readPackage(yamlFile: string): Promise<Package | undefined> {
-    if (!this.isPackageFile(yamlFile)) {
-      return undefined;
-    }
-
-    let fileinfo = undefined;
-    try {
-      fileinfo = Deno.lstatSync(yamlFile);
-    } catch (error) {
-      log.error(`!!! error loading package ${yamlFile}: ${error}`);
-    }
-
-    if (!fileinfo || !fileinfo.isFile) {
-      return undefined;
-    }
-
-    const packageName = yamlFile.replace(/.*[\/|\\]/g, "").replace(/\.levain(\.ya?ml)?/, "");
+    const packageName = path.basename(yamlFile).replace(/\.levain(\.ya?ml)?$/, "");
+    
     log.debug(`readPackage ${packageName} ${yamlFile}`);
 
     const yamlStr: string = Deno.readTextFileSync(yamlFile);
