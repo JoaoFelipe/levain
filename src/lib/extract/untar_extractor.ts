@@ -1,32 +1,36 @@
-import * as log from "https://deno.land/std/log/mod.ts";
+import * as log from "@std/log";
 
-import Config from "../config.ts";
+import type Config from "../config.ts";
 import ExtraBin from "../extra_bin.ts";
-import {Extractor} from "./extractor.ts";
+import { Extractor } from "./extractor.ts";
+import OsUtils from "../os/os_utils.ts";
 
 export class UnTar extends Extractor {
-    constructor(config: Config) {
-        super(config);
+  constructor(config: Config) {
+    super(config);
+  }
+
+  async extractImpl(src: string, dst: string) {
+    // TODO: Handle other os's
+    if (Deno.build.os != "windows") {
+      throw `${Deno.build.os} not supported`;
     }
 
-    async extractImpl(src: string, dst: string) {
-        // TODO: Handle other os's
-        if (Deno.build.os != "windows") {
-            throw `${Deno.build.os} not supported`;
-        }
+    log.debug(`-- UNTAR ${src} => ${dst}`);
 
-        log.debug(`-- UNTAR ${src} => ${dst}`);
+    const [exec, ...args] = OsUtils.parseCmd(
+      `cmd /u /c path ${ExtraBin.sevenZipDir};%PATH% && ( ${ExtraBin.sevenZipDir}\\7z.exe x ${src} -bsp2 -so | ${ExtraBin.sevenZipDir}\\7z.exe x -si -bd -ttar -o${dst} )`
+    )
 
-        let args = `cmd /u /c path ${ExtraBin.sevenZipDir};%PATH% && ( ${ExtraBin.sevenZipDir}\\7z.exe x ${src} -bsp2 -so | ${ExtraBin.sevenZipDir}\\7z.exe x -si -bd -ttar -o${dst} )`.split(" ");
+    const pcommand = await new Deno.Command(exec, {
+      args: args,
+      stdout: "null",
+    });
 
-        const p = Deno.run({
-            stdout: "null",
-            cmd: args
-        });
+    const status = await pcommand.output();
 
-        let status = await p.status();
-        if (!status.success) {
-            throw "CMD terminated with code " + status.code;
-        }
+    if (!status.success) {
+      throw "CMD terminated with code " + status.code;
     }
+  }
 }
