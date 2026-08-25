@@ -1,27 +1,20 @@
 import * as log from "https://deno.land/std/log/mod.ts";
-import * as path from "https://deno.land/std/path/mod.ts";
-
 import t from './src/lib/i18n.ts'
 
 import ConsoleAndFileLogger from './src/lib/logger/console_and_file_logger.ts'
 import {parseArgs} from "./src/lib/parse_args.ts";
 import {Timer} from "./src/lib/timer.ts";
+import LevainPaths from './src/lib/levain_paths.ts';
 
 import LevainCli from "./src/levain_cli.ts";
 
 export default class Levain {
     static get levainRootFile(): string {
-        //https://stackoverflow.com/questions/76647896/determine-if-running-uncompiled-ts-script-or-compiled-deno-executable
-        // SEE ALSO: scripts\levain-compile.cmd
-
-        const isCompiled = Deno.args.includes("--is_compiled_binary");
-        return isCompiled
-            ? Deno.execPath()
-            : path.fromFileUrl(import.meta.url)
+        return LevainPaths.levainRootFile
     }
 
     static get levainRootDir(): string {
-        return path.dirname(Levain.levainRootFile)
+        return LevainPaths.levainRootDir
     }
 
 

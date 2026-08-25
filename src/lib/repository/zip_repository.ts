@@ -5,14 +5,12 @@ import {ensureDirSync, existsSync} from "https://deno.land/std/fs/mod.ts";
 import Package from '../package/package.ts'
 import Config from '../config.ts';
 import FileCache from "../fs/file_cache.ts";
-import {Extractor} from "../extract/extractor.ts"
 
 import Repository from "./repository.ts";
 import AbstractRepository from './abstract_repository.ts';
 import RepositoryFactory from "./repository_factory.ts";
 
 import ReaderFactory from "../io/reader_factory.ts";
-import {ExtractorFactory} from "../extract/extractor_factory.ts";
 
 export default class ZipRepository extends AbstractRepository {
     private repoFactory: RepositoryFactory
@@ -88,8 +86,9 @@ export default class ZipRepository extends AbstractRepository {
     private async extractLocalZip(zipfile: string) {
         ensureDirSync(this.localDir)
 
-        const factory: ExtractorFactory = new ExtractorFactory()
-        const extractor: Extractor = factory.createExtractor(this.config, zipfile)
+        const {ExtractorFactory} = await import("../extract/extractor_factory.ts");
+        const factory = new ExtractorFactory()
+        const extractor = factory.createExtractor(this.config, zipfile)
         await extractor.extract(false, zipfile, this.localDir)
     }
 }

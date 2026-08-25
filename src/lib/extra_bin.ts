@@ -1,26 +1,30 @@
 import * as path from "https://deno.land/std/path/mod.ts";
 
-import LevainVersion from "../levain_version.ts";
-
-import OsUtils from "../lib/os/os_utils.ts";
+import LevainPaths from "./levain_paths.ts";
 
 export default class ExtraBin {
     static get extraBinDir(): string {
-        return path.resolve(LevainVersion.levainSrcDir, "extra-bin", Deno.build.os);
+        return path.resolve(LevainPaths.levainRootDir, "extra-bin", Deno.build.os);
     }
 
     static get sevenZipDir(): string {
-        OsUtils.onlyInWindows()
+        ExtraBin.onlyInWindows()
         return path.resolve(ExtraBin.extraBinDir, "7-Zip");
     }
 
     static get gitDir(): string {
-        OsUtils.onlyInWindows()
+        ExtraBin.onlyInWindows()
         return path.resolve(ExtraBin.extraBinDir, "git");
     }
 
     static get osUtilsDir(): string {
-        OsUtils.onlyInWindows()
+        ExtraBin.onlyInWindows()
         return path.resolve(ExtraBin.extraBinDir, "os-utils");
+    }
+
+    private static onlyInWindows() {
+        if (Deno.build.os !== 'windows') {
+            throw new Error(`${Deno.build.os} not supported`);
+        }
     }
 }

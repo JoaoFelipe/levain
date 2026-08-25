@@ -5,11 +5,11 @@ import t from './lib/i18n.ts'
 import Config from "./lib/config.ts";
 import ConsoleAndFileLogger from "./lib/logger/console_and_file_logger.ts";
 import Loader from "./lib/loader.ts";
+import LevainPaths from "./lib/levain_paths.ts";
 import UserInfoUtil from "./lib/user_info/userinfo_util.ts";
 import CliUtil from "./lib/cli_util.ts";
 import CommandFactory, {CommandNotFoundError} from "./cmd/command_factory.ts";
 import LevainReleases from "./lib/releases/levain_releases.ts";
-import Levain from "../levain.ts";
 
 import LevainVersion from "./levain_version.ts";
 import OsUtils from "./lib/os/os_utils.ts";
@@ -20,7 +20,7 @@ export default class LevainCli {
         log.info(t("levain_cli.levainVersion", { 
             version: LevainVersion.levainVersion, 
             denoVersion: Deno.version.deno,
-            levainRootFile: Levain.levainRootFile}));
+            levainRootFile: LevainPaths.levainRootFile}));
         log.info("");
 
         log.debug("args " + JSON.stringify(myArgs));
