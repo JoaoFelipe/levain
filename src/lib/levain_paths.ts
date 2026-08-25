@@ -8,6 +8,8 @@ export default class LevainPaths {
     );
 
     static get isCompiledBinary(): boolean {
+        // https://stackoverflow.com/questions/76647896/determine-if-running-uncompiled-ts-script-or-compiled-deno-executable
+        // See also: scripts/levain-compile.cmd
         return Deno.args.includes('--is_compiled_binary');
     }
 
